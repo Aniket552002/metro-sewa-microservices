@@ -1,0 +1,14 @@
+services:
+  mariadb-user:
+    image: mariadb:11
+    container_name: mariadb-user
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: metro_user_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - user_mariadb_data:/var/lib/mysql
+
+volumes:
+  user_mariadb_data:
