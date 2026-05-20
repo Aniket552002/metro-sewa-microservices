@@ -1,41 +1,16 @@
 package com.metrosewa.route_service.service;
 
 import com.metrosewa.route_service.entity.MetroLine;
-import com.metrosewa.route_service.repository.MetroLineRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-@Service
-@RequiredArgsConstructor
-public class MetroLineService {
+public interface MetroLineService {
 
-    private final MetroLineRepository metroLineRepository;
+    List<MetroLine> getAllLines();
 
-    public List<MetroLine> getAllLines() {
-        return metroLineRepository.findByActiveTrue();
-    }
+    MetroLine createLine(MetroLine metroLine);
 
-    public MetroLine createLine(MetroLine metroLine) {
-        return metroLineRepository.save(metroLine);
-    }
+    MetroLine updateLine(Long id, MetroLine updatedLine);
 
-    public MetroLine updateLine(Long id, MetroLine updatedLine) {
-        MetroLine existingLine = metroLineRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Metro line not found"));
-
-        existingLine.setLineNumber(updatedLine.getLineNumber());
-        existingLine.setLineName(updatedLine.getLineName());
-        existingLine.setColorCode(updatedLine.getColorCode());
-        existingLine.setStartStation(updatedLine.getStartStation());
-        existingLine.setEndStation(updatedLine.getEndStation());
-        existingLine.setActive(updatedLine.getActive());
-
-        return metroLineRepository.save(existingLine);
-    }
-
-    public void deleteLine(Long id) {
-        metroLineRepository.deleteById(id);
-    }
+    void deleteLine(Long id);
 }

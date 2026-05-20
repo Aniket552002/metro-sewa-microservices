@@ -1,6 +1,17 @@
-version: '3.8'
-
 services:
+  prometheus:
+    image: prom/prometheus
+    container_name: metrosewa-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    container_name: metrosewa-grafana
+    ports:
+      - "3000:3000"
 
   mariadb:
     image: mariadb:11

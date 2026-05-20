@@ -6,7 +6,7 @@ spring:
     name: ticket-service
 
   datasource:
-    url: jdbc:mariadb://localhost:3308/metro_ticket_db
+    url: jdbc:mariadb://localhost:3307/metro_ticket_db
     username: root
     password: root
     driver-class-name: org.mariadb.jdbc.Driver
@@ -26,17 +26,38 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-    resilience4j:
-      circuitbreaker:
-        instances:
-          routeService:
-            failure-rate-threshold: 50
-            minimum-number-of-calls: 5
-            wait-duration-in-open-state: 10s
-            sliding-window-size: 10
-            permitted-number-of-calls-in-half-open-state: 3
+resilience4j:
+  circuitbreaker:
+    instances:
+      routeService:
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 5
+        wait-duration-in-open-state: 10s
+        sliding-window-size: 10
+        sliding-window-type: COUNT_BASED
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
+        automatic-transition-from-open-to-half-open-enabled: true
 
-      timelimiter:
-        instances:
-          routeService:
-            timeout-duration: 3s
+  timelimiter:
+    instances:
+      routeService:
+        timeout-duration: 3s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents
+
+  endpoint:
+    health:
+      show-details: always
+
+  health:
+    circuitbreakers:
+      enabled: true
+
+  metrics:
+    tags:
+      application: ticket-service

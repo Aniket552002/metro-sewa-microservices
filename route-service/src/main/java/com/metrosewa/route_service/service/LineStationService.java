@@ -1,39 +1,16 @@
 package com.metrosewa.route_service.service;
 
 import com.metrosewa.route_service.entity.LineStation;
-import com.metrosewa.route_service.repository.LineStationRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-@Service
-@RequiredArgsConstructor
-public class LineStationService {
+public interface LineStationService {
 
-    private final LineStationRepository lineStationRepository;
+    List<LineStation> getAllLineStations();
 
-    public List<LineStation> getAllLineStations() {
-        return lineStationRepository.findAll();
-    }
+    LineStation createLineStation(LineStation lineStation);
 
-    public LineStation createLineStation(LineStation lineStation) {
-        return lineStationRepository.save(lineStation);
-    }
+    LineStation updateLineStation(Long id, LineStation updatedLineStation);
 
-    public LineStation updateLineStation(Long id, LineStation updatedLineStation) {
-        LineStation existing = lineStationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Line-station mapping not found"));
-
-        existing.setLineId(updatedLineStation.getLineId());
-        existing.setStationId(updatedLineStation.getStationId());
-        existing.setStationOrder(updatedLineStation.getStationOrder());
-        existing.setDistanceFromStart(updatedLineStation.getDistanceFromStart());
-
-        return lineStationRepository.save(existing);
-    }
-
-    public void deleteLineStation(Long id) {
-        lineStationRepository.deleteById(id);
-    }
+    void deleteLineStation(Long id);
 }
