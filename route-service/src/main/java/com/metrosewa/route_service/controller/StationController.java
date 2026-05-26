@@ -28,6 +28,7 @@ public class StationController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Station createStation(@RequestBody Station station) {
+        // Adds a metro station master record.
         return stationService.createStation(station);
     }
 

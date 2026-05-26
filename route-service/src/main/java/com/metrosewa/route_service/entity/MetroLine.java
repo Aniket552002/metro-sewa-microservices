@@ -5,13 +5,11 @@ import lombok.*;
 
 @Entity
 @Table(name = "metro_lines")
-
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class MetroLine {
 
     @Id
@@ -19,14 +17,9 @@ public class MetroLine {
     private Long id;
 
     private String lineNumber;
-
     private String lineName;
-
     private String colorCode;
-
     private String startStation;
-
     private String endStation;
-
     private Boolean active;
 }

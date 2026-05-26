@@ -23,6 +23,7 @@ public class MetroLineController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public MetroLine createLine(@RequestBody MetroLine metroLine) {
+        // Creates a metro line such as Red Line or Blue Line.
         return metroLineService.createLine(metroLine);
     }
 

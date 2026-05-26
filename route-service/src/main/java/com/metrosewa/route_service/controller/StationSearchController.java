@@ -14,21 +14,15 @@ public class StationSearchController {
 
     private final StationSearchService stationSearchService;
 
-    // ================= SYNC =================
-
     @PostMapping("/sync")
     public String syncStations() {
-
+        // Copies station data from MariaDB to Elasticsearch for search.
         return stationSearchService.syncStationsToElastic();
     }
 
-    // ================= SEARCH =================
-
     @GetMapping("/stations")
-    public List<StationDocument> searchStations(
-            @RequestParam String query
-    ) {
-
+    public List<StationDocument> searchStations(@RequestParam String query) {
+        // Searches station names using Elasticsearch.
         return stationSearchService.searchStations(query);
     }
 }

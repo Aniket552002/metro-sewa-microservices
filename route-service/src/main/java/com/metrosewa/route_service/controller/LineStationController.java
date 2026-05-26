@@ -23,6 +23,7 @@ public class LineStationController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public LineStation createLineStation(@RequestBody LineStation lineStation) {
+        // Stores which station belongs to which metro line and at what order.
         return lineStationService.createLineStation(lineStation);
     }
 

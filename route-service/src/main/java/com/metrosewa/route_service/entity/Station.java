@@ -5,13 +5,11 @@ import lombok.*;
 
 @Entity
 @Table(name = "stations")
-
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class Station {
 
     @Id
@@ -19,10 +17,7 @@ public class Station {
     private Long id;
 
     private String stationName;
-
     private String stationCode;
-
     private Boolean interchange;
-
     private Boolean active;
 }
