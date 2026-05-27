@@ -1,4 +1,4 @@
-package com.metrosewa.route_service.searchrepository;
+package com.metrosewa.route_service.repository;
 
 import com.metrosewa.route_service.document.StationDocument;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;

@@ -2,31 +2,34 @@ package com.metrosewa.user_service.util;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
 
-    private final String SECRET_KEY =
-            "mySecretKeymySecretKeymySecretKey123456";
+    @Value("${jwt.secret}")
+    private String secretKey;
 
-    private final long EXPIRATION = 86400000;
+    @Value("${jwt.expiration-ms}")
+    private long expirationMs;
 
     private Key getSignKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+        // The configured secret is converted into a key used for signing JWT tokens.
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(String mobileNumber) {
 
+        // Token contains the mobile number because users log in with mobile number.
         return Jwts.builder()
                 .setSubject(mobileNumber)
                 .setIssuedAt(new Date())
-                .setExpiration(
-                        new Date(System.currentTimeMillis() + EXPIRATION)
-                )
+                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getSignKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

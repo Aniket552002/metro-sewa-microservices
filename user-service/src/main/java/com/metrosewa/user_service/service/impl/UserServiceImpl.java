@@ -1,4 +1,4 @@
-package com.metrosewa.user_service.service;
+package com.metrosewa.user_service.service.impl;
 
 import com.metrosewa.user_service.dto.LoginRequest;
 import com.metrosewa.user_service.dto.LoginResponse;
@@ -6,10 +6,13 @@ import com.metrosewa.user_service.dto.UserRegisterRequest;
 import com.metrosewa.user_service.dto.UserResponse;
 import com.metrosewa.user_service.entity.User;
 import com.metrosewa.user_service.repository.UserRepository;
+import com.metrosewa.user_service.service.UserService;
 import com.metrosewa.user_service.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 
@@ -23,13 +26,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse registerUser(UserRegisterRequest request) {
-
+        // Mobile number and email should be unique for each user.
         if (userRepository.findByMobileNumber(request.getMobileNumber()).isPresent()) {
-            throw new RuntimeException("Mobile number already registered");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Mobile number already registered");
         }
 
         if (request.getEmail() != null && userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already registered");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
         }
 
         User user = User.builder()
@@ -42,21 +45,16 @@ public class UserServiceImpl implements UserService {
                 .build();
 
         User savedUser = userRepository.save(user);
-
-        return UserResponse.builder()
-                .id(savedUser.getId())
-                .fullName(savedUser.getFullName())
-                .mobileNumber(savedUser.getMobileNumber())
-                .email(savedUser.getEmail())
-                .role(savedUser.getRole())
-                .build();
+        return mapToUserResponse(savedUser);
     }
 
     @Override
     public LoginResponse login(LoginRequest request) {
-
         User user = userRepository.findByMobileNumber(request.getMobileNumber())
-                .orElseThrow(() -> new RuntimeException("Invalid mobile number"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "Invalid mobile number"
+                ));
 
         boolean passwordMatches = passwordEncoder.matches(
                 request.getPassword(),
@@ -64,9 +62,10 @@ public class UserServiceImpl implements UserService {
         );
 
         if (!passwordMatches) {
-            throw new RuntimeException("Invalid password");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid password");
         }
 
+        // Mobile number is used as the token subject because users log in with mobile number.
         String token = jwtUtil.generateToken(user.getMobileNumber());
 
         return new LoginResponse(token);
@@ -74,10 +73,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse getUserByMobileNumber(String mobileNumber) {
-
         User user = userRepository.findByMobileNumber(mobileNumber)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
+        return mapToUserResponse(user);
+    }
+
+    private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())

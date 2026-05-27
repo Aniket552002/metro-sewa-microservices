@@ -23,6 +23,7 @@ services:
       - "3307:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
+      - ./docker/mariadb/init:/docker-entrypoint-initdb.d
 
   route-redis:
     image: redis:latest

@@ -9,18 +9,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class RouteSegment {
 
     private String lineNumber;
-
     private String lineName;
-
     private String colorCode;
-
     private String fromStation;
-
     private String toStation;
-
     private List<String> stations;
 }

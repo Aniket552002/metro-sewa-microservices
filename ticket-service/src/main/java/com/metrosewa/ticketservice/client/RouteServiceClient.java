@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface RouteServiceClient {
 
     @GetMapping("/api/route-planner/plan")
+    // Calls route-service to get distance, fare, time, and interchange details.
     RouteResponse planRoute(
             @RequestParam("source") String source,
             @RequestParam("destination") String destination

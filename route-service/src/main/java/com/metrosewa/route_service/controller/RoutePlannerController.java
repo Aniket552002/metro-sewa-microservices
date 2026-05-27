@@ -17,6 +17,7 @@ public class RoutePlannerController {
             @RequestParam String source,
             @RequestParam String destination
     ) {
+        // Finds route details between two station names.
         return routePlannerService.planRoute(source, destination);
     }
 }

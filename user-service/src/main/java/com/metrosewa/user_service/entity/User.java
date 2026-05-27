@@ -1,10 +1,9 @@
-
 package com.metrosewa.user_service.entity;
 
 import jakarta.persistence.*;
-        import lombok.*;
+import lombok.*;
 
-        import java.time.LocalDateTime;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")

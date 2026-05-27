@@ -5,13 +5,11 @@ import lombok.*;
 
 @Entity
 @Table(name = "line_stations")
-
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class LineStation {
 
     @Id
@@ -19,10 +17,7 @@ public class LineStation {
     private Long id;
 
     private Long lineId;
-
     private Long stationId;
-
     private Integer stationOrder;
-
     private Double distanceFromStart;
 }

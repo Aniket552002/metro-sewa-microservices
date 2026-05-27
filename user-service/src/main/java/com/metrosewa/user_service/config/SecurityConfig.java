@@ -22,6 +22,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
 
+                // Registration and login are public. Other user APIs need authentication.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/users/register",
