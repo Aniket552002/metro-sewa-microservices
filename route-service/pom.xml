@@ -12,8 +12,8 @@
 	<artifactId>route-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 
-	<name>user-service</name>
-	<description>User service for MetroSewa</description>
+	<name>route-service</name>
+	<description>Route service for MetroSewa</description>
 
 	<properties>
 		<java.version>21</java.version>
