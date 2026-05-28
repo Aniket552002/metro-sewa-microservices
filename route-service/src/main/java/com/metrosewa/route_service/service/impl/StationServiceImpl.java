@@ -6,12 +6,15 @@ import com.metrosewa.route_service.repository.LineStationRepository;
 import com.metrosewa.route_service.repository.StationRepository;
 import com.metrosewa.route_service.service.StationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
+
 /**
  * This service handles station master data.
  *
@@ -31,9 +34,23 @@ public class StationServiceImpl implements StationService {
         return stationRepository.findAll();
     }
 
+    /**
+     * Redis cache is used here because stations by line are requested repeatedly.
+     *
+     * First request:
+     * - Data comes from MariaDB
+     * - Result is stored in Redis cache
+     *
+     * Second request with same lineId:
+     * - Data comes directly from Redis
+     * - Database query is skipped
+     */
     @Override
+    @Cacheable(value = "stationsByLine", key = "#lineId")
     public List<String> getStationsByLine(Long lineId) {
-        // LineStation stores station order, so it is used to return stations in travel order.
+
+        System.out.println("Fetching stations from database for lineId: " + lineId);
+
         List<LineStation> lineStations =
                 lineStationRepository.findByLineIdOrderByStationOrderAsc(lineId);
 
@@ -52,14 +69,22 @@ public class StationServiceImpl implements StationService {
         return stationNames;
     }
 
+    /**
+     * When station is created, station cache is cleared.
+     */
     @Override
+    @CacheEvict(value = "stationsByLine", allEntries = true)
     public Station createStation(Station station) {
         return stationRepository.save(station);
     }
 
+    /**
+     * When station is updated, station cache is cleared.
+     */
     @Override
+    @CacheEvict(value = "stationsByLine", allEntries = true)
     public Station updateStation(Long id, Station updatedStation) {
-        // Update the station master data while keeping the same id.
+
         Station existingStation = stationRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
@@ -74,7 +99,11 @@ public class StationServiceImpl implements StationService {
         return stationRepository.save(existingStation);
     }
 
+    /**
+     * When station is deleted, station cache is cleared.
+     */
     @Override
+    @CacheEvict(value = "stationsByLine", allEntries = true)
     public void deleteStation(Long id) {
         stationRepository.deleteById(id);
     }
