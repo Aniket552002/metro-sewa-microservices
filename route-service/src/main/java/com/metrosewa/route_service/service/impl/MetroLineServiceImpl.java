@@ -39,7 +39,7 @@ public class MetroLineServiceImpl implements MetroLineService {
     public List<MetroLine> getAllLines() {
 
         System.out.println("Fetching metro lines from database...");
-        log.info("Fetching metro lines from MariaDB");
+        
         return metroLineRepository.findByActiveTrue();
     }
 
