@@ -37,9 +37,7 @@ public class MetroLineServiceImpl implements MetroLineService {
     @Override
     @Cacheable(value = "metroLines")
     public List<MetroLine> getAllLines() {
-
         System.out.println("Fetching metro lines from database...");
-        
         return metroLineRepository.findByActiveTrue();
     }
 
