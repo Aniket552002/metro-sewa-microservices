@@ -1,6 +1,4 @@
 package com.metrosewa.route_service.service.impl;
-
-import com.metrosewa.route_service.entity.LineStation;
 import com.metrosewa.route_service.entity.Station;
 import com.metrosewa.route_service.repository.LineStationRepository;
 import com.metrosewa.route_service.repository.StationRepository;
@@ -12,7 +10,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -38,12 +35,19 @@ public class StationServiceImpl implements StationService {
      * Redis cache is used here because stations by line are requested repeatedly.
      *
      * First request:
-     * - Data comes from MariaDB
+     * - Data comes from MariaDB using a single JOIN query
      * - Result is stored in Redis cache
      *
      * Second request with same lineId:
      * - Data comes directly from Redis
      * - Database query is skipped
+     * Scalability improvement:
+     * Earlier this method had an N+1 query problem:
+     * - 1 query to fetch line-station mappings
+     * - then 1 extra query per station inside the loop
+     *
+     * Now it uses one JOIN query through findStationNamesByLineId().
+     * This reduces database calls and makes the API better for high traffic.
      */
     @Override
     @Cacheable(value = "stationsByLine", key = "#lineId")
@@ -51,19 +55,13 @@ public class StationServiceImpl implements StationService {
 
         System.out.println("Fetching stations from database for lineId: " + lineId);
 
-        List<LineStation> lineStations =
-                lineStationRepository.findByLineIdOrderByStationOrderAsc(lineId);
+        List<String> stationNames = lineStationRepository.findStationNamesByLineId(lineId);
 
-        List<String> stationNames = new ArrayList<>();
-
-        for (LineStation lineStation : lineStations) {
-            Station station = stationRepository.findById(lineStation.getStationId())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.NOT_FOUND,
-                            "Station not found"
-                    ));
-
-            stationNames.add(station.getStationName());
+        if (stationNames.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "No stations found for lineId: " + lineId
+            );
         }
 
         return stationNames;
