@@ -4,7 +4,12 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "stations")
+@Table(
+        name = "stations",
+        indexes = {
+                @Index(name = "idx_station_name", columnList = "stationName")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -15,7 +20,6 @@ public class Station {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private String stationName;
     private String stationCode;
     private Boolean interchange;

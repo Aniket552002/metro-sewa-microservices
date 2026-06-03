@@ -4,7 +4,13 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "metro_lines")
+@Table(
+        name = "metro_lines",
+        indexes = {
+                @Index(name = "idx_metro_line_active", columnList = "active"),
+                @Index(name = "idx_metro_line_number", columnList = "lineNumber")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
