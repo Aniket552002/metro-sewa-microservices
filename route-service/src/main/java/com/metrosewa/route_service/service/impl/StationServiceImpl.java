@@ -50,7 +50,7 @@ public class StationServiceImpl implements StationService {
      * This reduces database calls and makes the API better for high traffic.
      */
     @Override
-    @Cacheable(value = "stationsByLine", key = "#lineId")
+    @CacheEvict(value = {"routePlans", "stationsByLine"}, allEntries = true)
     public List<String> getStationsByLine(Long lineId) {
 
         System.out.println("Fetching stations from database for lineId: " + lineId);
@@ -71,7 +71,7 @@ public class StationServiceImpl implements StationService {
      * When station is created, station cache is cleared.
      */
     @Override
-    @CacheEvict(value = "stationsByLine", allEntries = true)
+    @CacheEvict(value = {"routePlans", "stationsByLine"}, allEntries = true)
     public Station createStation(Station station) {
         return stationRepository.save(station);
     }

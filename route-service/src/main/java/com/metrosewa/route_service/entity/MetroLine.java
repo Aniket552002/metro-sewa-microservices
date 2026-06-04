@@ -7,8 +7,8 @@ import lombok.*;
 @Table(
         name = "metro_lines",
         indexes = {
-                @Index(name = "idx_metro_line_active", columnList = "active"),
-                @Index(name = "idx_metro_line_number", columnList = "lineNumber")
+                @Index(name = "idx_metro_line_number", columnList = "line_number"),
+                @Index(name = "idx_metro_line_active", columnList = "active")
         }
 )
 @Getter
@@ -22,10 +22,15 @@ public class MetroLine {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "line_number", nullable = false)
     private String lineNumber;
+
+    @Column(name = "line_name", nullable = false)
     private String lineName;
+
+    @Column(name = "color_code")
     private String colorCode;
-    private String startStation;
-    private String endStation;
+
+    @Column(name = "active")
     private Boolean active;
 }

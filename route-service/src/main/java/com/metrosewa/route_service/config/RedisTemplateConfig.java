@@ -1,0 +1,32 @@
+package com.metrosewa.route_service.config;
+
+import com.metrosewa.route_service.dto.RoutePlanResponse;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.JdkSerializationRedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+@Configuration
+public class RedisTemplateConfig {
+
+    @Bean
+    public RedisTemplate<String, RoutePlanResponse> routePlanRedisTemplate(
+            RedisConnectionFactory connectionFactory
+    ) {
+        RedisTemplate<String, RoutePlanResponse> template = new RedisTemplate<>();
+
+        template.setConnectionFactory(connectionFactory);
+
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setHashKeySerializer(new StringRedisSerializer());
+
+        template.setValueSerializer(new JdkSerializationRedisSerializer());
+        template.setHashValueSerializer(new JdkSerializationRedisSerializer());
+
+        template.afterPropertiesSet();
+
+        return template;
+    }
+}
