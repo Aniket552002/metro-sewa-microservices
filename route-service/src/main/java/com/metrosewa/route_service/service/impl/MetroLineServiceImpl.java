@@ -4,6 +4,7 @@ import com.metrosewa.route_service.entity.MetroLine;
 import com.metrosewa.route_service.repository.MetroLineRepository;
 import com.metrosewa.route_service.service.MetroLineService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import java.util.List;
  *
  * It is used to create, update, delete, and fetch metro lines.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MetroLineServiceImpl implements MetroLineService {
@@ -37,7 +39,7 @@ public class MetroLineServiceImpl implements MetroLineService {
     @Override
     @Cacheable(value = "metroLines")
     public List<MetroLine> getAllLines() {
-        System.out.println("Fetching metro lines from database...");
+        log.info("Fetching active metro lines from database");
         return metroLineRepository.findByActiveTrue();
     }
 
@@ -47,6 +49,7 @@ public class MetroLineServiceImpl implements MetroLineService {
     @Override
     @CacheEvict(value = "metroLines", allEntries = true)
     public MetroLine createLine(MetroLine metroLine) {
+        log.info("Creating new metro line: {}", metroLine.getLineName());
         return metroLineRepository.save(metroLine);
     }
 
@@ -56,6 +59,8 @@ public class MetroLineServiceImpl implements MetroLineService {
     @Override
     @CacheEvict(value = "metroLines", allEntries = true)
     public MetroLine updateLine(Long id, MetroLine updatedLine) {
+
+        log.info("Updating metro line with id: {}", id);
 
         MetroLine existingLine = metroLineRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -77,6 +82,7 @@ public class MetroLineServiceImpl implements MetroLineService {
     @Override
     @CacheEvict(value = "metroLines", allEntries = true)
     public void deleteLine(Long id) {
+        log.info("Deleting metro line with id: {}", id);
         metroLineRepository.deleteById(id);
     }
 }

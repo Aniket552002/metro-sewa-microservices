@@ -48,9 +48,9 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
      * This delay is only for testing distributed lock behavior.
      * It makes first DB calculation slow so parallel requests overlap.
      *
-     * After showing this to trainer/manager, change this to false.
+   .
      */
-    private static final boolean ENABLE_LOCK_TEST_DELAY = false;
+    private static final boolean ENABLE_LOCK_TEST_DELAY = true;
     private static final long LOCK_TEST_DELAY_MILLISECONDS = 5000;
 
     private final MetroLineRepository metroLineRepository;
@@ -69,10 +69,9 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
      * 3. Check Redis cache manually.
      * 4. If cache hit, return cached response.
      * 5. If cache miss, acquire Redis distributed lock.
-     * 6. After lock, double-check Redis cache again.
-     * 7. If still missing, calculate route from DB.
-     * 8. Save result in Redis with TTL.
-     * 9. Release lock safely.
+     * 6. fetch data from db and save inside the redis.
+     * 7. lock release,another request come,cheak first redis.
+     * 8.get data from cache .
      */
     @Override
     public RoutePlanResponse planRoute(String sourceName, String destinationName) {
