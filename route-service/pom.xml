@@ -12,8 +12,8 @@
 	<artifactId>route-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 
-	<name>user-service</name>
-	<description>User service for MetroSewa</description>
+	<name>route-service</name>
+	<description>Route service for MetroSewa</description>
 
 	<properties>
 		<java.version>21</java.version>
@@ -51,10 +51,9 @@
 			<artifactId>micrometer-registry-prometheus</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-devtools</artifactId>
-			<scope>runtime</scope>
-			<optional>true</optional>
+			<groupId>org.redisson</groupId>
+			<artifactId>redisson-spring-boot-starter</artifactId>
+			<version>4.4.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.mariadb.jdbc</groupId>

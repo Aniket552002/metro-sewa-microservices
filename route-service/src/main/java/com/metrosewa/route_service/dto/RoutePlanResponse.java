@@ -2,6 +2,7 @@ package com.metrosewa.route_service.dto;
 
 import lombok.*;
 
+import java.io.Serializable;
 import java.util.List;
 
 @Getter
@@ -9,7 +10,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RoutePlanResponse {
+public class RoutePlanResponse implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String source;
     private String destination;

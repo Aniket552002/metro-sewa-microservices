@@ -5,6 +5,7 @@ import com.metrosewa.route_service.exception.ResourceNotFoundException;
 import com.metrosewa.route_service.repository.LineStationRepository;
 import com.metrosewa.route_service.service.LineStationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -32,7 +33,15 @@ public class LineStationServiceImpl implements LineStationService {
         return lineStationRepository.findAll();
     }
 
+    /**
+     * Creates a new line-station mapping.
+     *
+     * Cache eviction:
+     * If a new station is added to a line, old route plans and station lists
+     * may become stale. So routePlans and stationsByLine caches are cleared.
+     */
     @Override
+    @CacheEvict(value = {"routePlans", "stationsByLine"}, allEntries = true)
     public LineStation createLineStation(LineStation lineStation) {
         return lineStationRepository.save(lineStation);
     }
@@ -45,8 +54,13 @@ public class LineStationServiceImpl implements LineStationService {
      *
      * Only mapping fields are updated.
      * Database id is not changed.
+     *
+     * Cache eviction:
+     * If lineId, stationId, stationOrder, or distance changes,
+     * route planner result and station list can become stale.
      */
     @Override
+    @CacheEvict(value = {"routePlans", "stationsByLine"}, allEntries = true)
     public LineStation updateLineStation(Long id, LineStation updatedLineStation) {
         LineStation existing = lineStationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -66,8 +80,13 @@ public class LineStationServiceImpl implements LineStationService {
      *
      * Before deleting, it checks whether the mapping exists.
      * This avoids silent delete when wrong id is passed.
+     *
+     * Cache eviction:
+     * If a mapping is deleted, old Redis route plans and station lists
+     * should not be reused.
      */
     @Override
+    @CacheEvict(value = {"routePlans", "stationsByLine"}, allEntries = true)
     public void deleteLineStation(Long id) {
         if (!lineStationRepository.existsById(id)) {
             throw new ResourceNotFoundException(

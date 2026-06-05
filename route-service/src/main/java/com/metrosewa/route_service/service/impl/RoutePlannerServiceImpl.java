@@ -12,14 +12,21 @@ import com.metrosewa.route_service.repository.MetroLineRepository;
 import com.metrosewa.route_service.repository.StationRepository;
 import com.metrosewa.route_service.service.RoutePlannerService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RoutePlannerServiceImpl implements RoutePlannerService {
@@ -28,25 +35,175 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
     private static final int MINUTES_PER_STATION = 3;
     private static final int INTERCHANGE_WAIT_MINUTES = 5;
 
+    private static final Duration ROUTE_PLAN_CACHE_TTL = Duration.ofMinutes(30);
+
+    /*
+     * For distributed lock testing, wait time is kept higher than test delay.
+     * This allows other parallel requests to wait until first request saves data in Redis.
+     */
+    private static final long LOCK_WAIT_TIME_SECONDS = 10;
+    private static final long LOCK_LEASE_TIME_SECONDS = 20;
+
+    /*
+     * This delay is only for testing distributed lock behavior.
+     * It makes first DB calculation slow so parallel requests overlap.
+     *
+   .
+     */
+    private static final boolean ENABLE_LOCK_TEST_DELAY = true;
+    private static final long LOCK_TEST_DELAY_MILLISECONDS = 5000;
+
     private final MetroLineRepository metroLineRepository;
     private final StationRepository stationRepository;
     private final LineStationRepository lineStationRepository;
 
+    private final RedisTemplate<String, RoutePlanResponse> routePlanRedisTemplate;
+    private final RedissonClient redissonClient;
+
     /**
-     * Main route planning method.
+     * Main route planning method with manual Redis cache + Redisson distributed lock.
      *
-     * Flow:
-     * 1. Validate source and destination input.
-     * 2. Find source and destination stations from database.
-     * 3. Get all metro lines connected to source and destination.
-     * 4. Check if both stations are on the same line using HashMap lookup.
-     * 5. If same line exists, return direct route.
-     * 6. If same line does not exist, plan route using Civil Court interchange.
+     * Production flow:
+     * 1. Validate source and destination.
+     * 2. Build Redis cache key.
+     * 3. Check Redis cache manually.
+     * 4. If cache hit, return cached response.
+     * 5. If cache miss, acquire Redis distributed lock.
+     * 6. fetch data from db and save inside the redis.
+     * 7. lock release,another request come,cheak first redis.
+     * 8.get data from cache .
      */
     @Override
     public RoutePlanResponse planRoute(String sourceName, String destinationName) {
         validateRouteInput(sourceName, destinationName);
 
+        String cacheKey = buildRoutePlanCacheKey(sourceName, destinationName);
+        String lockKey = buildRoutePlanLockKey(sourceName, destinationName);
+        String threadName = Thread.currentThread().getName();
+
+        log.info("[ROUTE-PLAN] Request received. source={}, destination={}, thread={}",
+                sourceName, destinationName, threadName);
+
+        log.info("[CACHE-CHECK] Checking Redis cache. key={}, thread={}", cacheKey, threadName);
+
+        RoutePlanResponse cachedResponse = getRoutePlanFromCache(cacheKey);
+        if (cachedResponse != null) {
+            log.info("[CACHE-HIT] Returning route from Redis. key={}, thread={}", cacheKey, threadName);
+            return cachedResponse;
+        }
+
+        log.info("[CACHE-MISS] Route not found in Redis. key={}, thread={}", cacheKey, threadName);
+
+        RLock lock = redissonClient.getLock(lockKey);
+        boolean lockAcquired = false;
+
+        try {
+            log.info("[LOCK-TRY] Trying to acquire Redis lock. lockKey={}, waitTime={}s, leaseTime={}s, thread={}",
+                    lockKey, LOCK_WAIT_TIME_SECONDS, LOCK_LEASE_TIME_SECONDS, threadName);
+
+            lockAcquired = lock.tryLock(
+                    LOCK_WAIT_TIME_SECONDS,
+                    LOCK_LEASE_TIME_SECONDS,
+                    TimeUnit.SECONDS
+            );
+
+            if (lockAcquired) {
+                log.info("[LOCK-ACQUIRED] Redis lock acquired. lockKey={}, thread={}",
+                        lockKey, threadName);
+
+                /*
+                 * Double-check Redis after acquiring lock.
+                 * Another request may have already calculated and saved the route
+                 * while this request was waiting for the lock.
+                 */
+                log.info("[DOUBLE-CHECK] Checking Redis again after lock. key={}, thread={}",
+                        cacheKey, threadName);
+
+                cachedResponse = getRoutePlanFromCache(cacheKey);
+                if (cachedResponse != null) {
+                    log.info("[DOUBLE-CHECK-HIT] Cache filled by another request. Returning Redis data. key={}, thread={}",
+                            cacheKey, threadName);
+                    return cachedResponse;
+                }
+
+                if (ENABLE_LOCK_TEST_DELAY) {
+                    log.info("[LOCK-TEST-DELAY] Temporary delay started to prove distributed lock. delay={}ms, thread={}",
+                            LOCK_TEST_DELAY_MILLISECONDS, threadName);
+                    Thread.sleep(LOCK_TEST_DELAY_MILLISECONDS);
+                    log.info("[LOCK-TEST-DELAY] Temporary delay completed. thread={}", threadName);
+                }
+
+                log.info("[DB-CALCULATION-START] Calculating route from DB. key={}, thread={}",
+                        cacheKey, threadName);
+
+                RoutePlanResponse freshResponse = calculateRoutePlanFromDb(sourceName, destinationName);
+
+                log.info("[DB-CALCULATION-END] DB route calculation completed. key={}, thread={}",
+                        cacheKey, threadName);
+
+                saveRoutePlanInCache(cacheKey, freshResponse);
+
+                log.info("[CACHE-SAVE] Route saved in Redis with TTL={} minutes. key={}, thread={}",
+                        ROUTE_PLAN_CACHE_TTL.toMinutes(), cacheKey, threadName);
+
+                return freshResponse;
+            }
+
+            /*
+             * If lock is not acquired within wait time, check Redis once more.
+             */
+            log.warn("[LOCK-NOT-ACQUIRED] Could not acquire Redis lock within wait time. lockKey={}, thread={}",
+                    lockKey, threadName);
+
+            log.info("[CACHE-RECHECK] Rechecking Redis after lock wait failed. key={}, thread={}",
+                    cacheKey, threadName);
+
+            cachedResponse = getRoutePlanFromCache(cacheKey);
+            if (cachedResponse != null) {
+                log.info("[CACHE-HIT-AFTER-LOCK-WAIT] Returning route from Redis. key={}, thread={}",
+                        cacheKey, threadName);
+                return cachedResponse;
+            }
+
+            /*
+             * Fallback:
+             * API should not fail only because lock was busy.
+             * This keeps availability, but in ideal test this should not happen.
+             */
+            log.warn("[FALLBACK-DB-CALCULATION] Lock not acquired and cache still empty. Calculating directly. key={}, thread={}",
+                    cacheKey, threadName);
+
+            return calculateRoutePlanFromDb(sourceName, destinationName);
+
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+
+            log.error("[LOCK-INTERRUPTED] Route planning interrupted while waiting for Redis lock. lockKey={}, thread={}",
+                    lockKey, threadName, exception);
+
+            throw new IllegalStateException(
+                    "Route planning interrupted while waiting for Redis lock",
+                    exception
+            );
+
+        } finally {
+            if (lockAcquired && lock.isHeldByCurrentThread()) {
+                log.info("[LOCK-RELEASE] Releasing Redis lock. lockKey={}, thread={}",
+                        lockKey, threadName);
+                lock.unlock();
+                log.info("[LOCK-RELEASED] Redis lock released. lockKey={}, thread={}",
+                        lockKey, threadName);
+            }
+        }
+    }
+
+    /**
+     * Actual DB-based route calculation.
+     *
+     * This method contains the old route planner logic.
+     * It is called only when Redis cache is missing.
+     */
+    private RoutePlanResponse calculateRoutePlanFromDb(String sourceName, String destinationName) {
         Station source = findStationByName(sourceName, "Source station not found");
         Station destination = findStationByName(destinationName, "Destination station not found");
 
@@ -95,10 +252,55 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
     }
 
     /**
-     * Validates user input before route planning.
+     * Builds Redis cache key for route planner response.
      *
-     * Empty source, empty destination, or same source/destination is a client-side mistake,
-     * so BadRequestException is thrown and API returns 400 Bad Request.
+     * Example:
+     * source = vanaz, destination = ramwadi
+     * cache key = routePlans::vanaz::ramwadi
+     */
+    private String buildRoutePlanCacheKey(String sourceName, String destinationName) {
+        return "routePlans::"
+                + sourceName.trim().toLowerCase()
+                + "::"
+                + destinationName.trim().toLowerCase();
+    }
+
+    /**
+     * Builds Redis lock key for route planner cache rebuild.
+     *
+     * Cache key stores actual route response.
+     * Lock key is only used to control which request rebuilds cache.
+     *
+     * Example:
+     * lock key = lock:routePlans::vanaz::ramwadi
+     */
+    private String buildRoutePlanLockKey(String sourceName, String destinationName) {
+        return "lock:routePlans::"
+                + sourceName.trim().toLowerCase()
+                + "::"
+                + destinationName.trim().toLowerCase();
+    }
+
+    /**
+     * Reads route plan response from Redis manually.
+     */
+    private RoutePlanResponse getRoutePlanFromCache(String cacheKey) {
+        return routePlanRedisTemplate.opsForValue().get(cacheKey);
+    }
+
+    /**
+     * Stores route plan response in Redis with TTL.
+     *
+     * TTL is 30 minutes because route plans are useful to cache,
+     * but should not stay forever.
+     */
+    private void saveRoutePlanInCache(String cacheKey, RoutePlanResponse response) {
+        routePlanRedisTemplate.opsForValue()
+                .set(cacheKey, response, ROUTE_PLAN_CACHE_TTL);
+    }
+
+    /**
+     * Validates user input before route planning.
      */
     private void validateRouteInput(String sourceName, String destinationName) {
         if (sourceName == null || sourceName.isBlank()) {
@@ -116,14 +318,6 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
 
     /**
      * Builds route response when source and destination are on the same metro line.
-     *
-     * This method calculates:
-     * 1. Stations between source and destination.
-     * 2. Total station count.
-     * 3. Total distance.
-     * 4. Estimated travel time.
-     * 5. Fare.
-     * 6. Single route segment because no interchange is required.
      */
     private RoutePlanResponse buildDirectRoute(
             Station source,
@@ -174,18 +368,6 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
 
     /**
      * Builds route response when source and destination are on different metro lines.
-     *
-     * Current business logic:
-     * 1. Civil Court is used as the fixed interchange station.
-     * 2. Get all line mappings of Civil Court.
-     * 3. Store Civil Court line mappings in HashMap by lineId.
-     * 4. Check if source line connects to Civil Court.
-     * 5. Check if destination line connects to Civil Court.
-     * 6. If both are connected, return two route parts:
-     *    - Source -> Civil Court
-     *    - Civil Court -> Destination
-     *
-     * This avoids nested source/destination line comparison and avoids repeated DB calls inside loop.
      */
     private RoutePlanResponse buildInterchangeRoute(
             Station source,
@@ -283,16 +465,6 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
 
     /**
      * Returns station names between source station order and destination station order.
-     *
-     * Old logic:
-     * - Fetched all stations of the line.
-     * - Filtered stations in Java.
-     * - Called stationRepository.findById() inside loop.
-     *
-     * New logic:
-     * - Repository query joins LineStation and Station.
-     * - Database filters by lineId and stationOrder range.
-     * - Only required station names are returned.
      */
     private List<String> getStationsBetween(
             Long lineId,
@@ -318,13 +490,6 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
 
     /**
      * Calculates fare using simple distance slabs.
-     *
-     * Current fare rules:
-     * 0 - 2 km      = 10
-     * 2 - 5 km      = 20
-     * 5 - 10 km     = 30
-     * 10 - 15 km    = 40
-     * Above 15 km   = 50
      */
     private double calculateFare(double distance) {
         if (distance <= 2) {
@@ -342,9 +507,6 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
 
     /**
      * Finds station by station name.
-     *
-     * If station is not found, ResourceNotFoundException is thrown.
-     * GlobalExceptionHandler converts that exception into 404 Not Found response.
      */
     private Station findStationByName(String stationName, String errorMessage) {
         return stationRepository.findByStationNameIgnoreCase(stationName.trim())
